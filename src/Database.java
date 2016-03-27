@@ -24,24 +24,23 @@ public class Database {
         catch (IOException e) {}
     }
 
-    public void put(String tag, int i) {
-
+    public void put(String tag, int value) {
+        PutCommand p = new PutCommand(tag, value);
+        p.execute();
     }
 
-    public void put(String tag, String s) {
-
+    public void put(String tag, String value) {
     }
 
-    public void put(String tag, Object[] o) {
-
+    public void put(String tag, Object[] value) {
     }
 
-    public void put(String tag, Map m) {
-
+    public boolean put(String tag, Map value) {
+        return true;
     }
 
-    public void retrieve (String tag) {
-
+    public Object retrieve (String tag) {
+        return null;
     }
 
     private void close() {

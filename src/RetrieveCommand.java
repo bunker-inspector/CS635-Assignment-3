@@ -3,24 +3,24 @@ import java.util.Map;
 /**
  * Created by ted on 3/27/16.
  */
-public class RetrieveCommand extends AbstractCommand {
+public class RetrieveCommand extends Command {
     RetrieveCommand(String tag, int value) {
-        execute = (Void) -> Database.getInstance().retrieve(tag);
-        undo    = (Void) -> Database.getInstance().put(tag, value);
+        execute = () -> Database.getInstance().retrieve(tag);
+        undo    = () -> Database.getInstance().put(tag, value);
     }
 
-    RetrieveCommand(String tag, String value) {
-        execute = (Void) -> Database.getInstance().retrieve(tag);
-        undo    = (Void) -> Database.getInstance().put(tag, value);
+    RetrieveCommand(String tag, String value, Database d) {
+        execute = () -> Database.getInstance().retrieve(tag);
+        undo    = () -> Database.getInstance().put(tag, value);
     }
 
-    RetrieveCommand(String tag, Object[] value) {
-        execute = (Void) -> Database.getInstance().retrieve(tag);
-        undo    = (Void) -> Database.getInstance().put(tag, value);
+    RetrieveCommand(String tag, Object[] value, Database d) {
+        execute = () -> Database.getInstance().retrieve(tag);
+        undo    = () -> Database.getInstance().put(tag, value);
     }
 
-    RetrieveCommand(String tag, Map value) {
-        execute = (Void) -> Database.getInstance().retrieve(tag);
-        undo    = (Void) -> Database.getInstance().put(tag, value);
+    RetrieveCommand(String tag, Map value, Database d) {
+        execute = () -> Database.getInstance().retrieve(tag);
+        undo    = () -> Database.getInstance().put(tag, value);
     }
 }
