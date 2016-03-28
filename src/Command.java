@@ -1,17 +1,15 @@
-import java.util.function.Consumer;
-
 /**
  * Created by ted on 3/27/16.
  */
 public abstract class Command {
-    IExecute execute;
-    IUndo undo;
+    IExecute executer;
+    IUndo undoer;
 
     void execute() {
-        execute.execute();
+        executer.execute();
     }
 
     void undo() {
-        undo.undo();
+        undoer.undo();
     }
 }

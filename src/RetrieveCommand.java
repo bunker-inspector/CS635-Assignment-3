@@ -5,22 +5,38 @@ import java.util.Map;
  */
 public class RetrieveCommand extends Command {
     RetrieveCommand(String tag, int value) {
-        execute = () -> Database.getInstance().retrieve(tag);
-        undo    = () -> Database.getInstance().put(tag, value);
+        executer = () -> {
+            Object result = Database.getInstance().data.getInt(tag);
+            Database.getInstance().data.remove(tag);
+            return result;
+        };
+        undoer   = () -> Database.getInstance().data.put(tag, value);
     }
 
     RetrieveCommand(String tag, String value, Database d) {
-        execute = () -> Database.getInstance().retrieve(tag);
-        undo    = () -> Database.getInstance().put(tag, value);
+        executer = () -> {
+            Object result = Database.getInstance().data.getString(tag);
+            Database.getInstance().data.remove(tag);
+            return result;
+        };
+        undoer   = () -> Database.getInstance().data.put(tag, value);
     }
 
     RetrieveCommand(String tag, Object[] value, Database d) {
-        execute = () -> Database.getInstance().retrieve(tag);
-        undo    = () -> Database.getInstance().put(tag, value);
+        executer = () -> {
+            Object result = Database.getInstance().data.getJSONArray(tag);
+            Database.getInstance().data.remove(tag);
+            return result;
+        };
+        undoer   = () -> Database.getInstance().data.put(tag, value);
     }
 
     RetrieveCommand(String tag, Map value, Database d) {
-        execute = () -> Database.getInstance().retrieve(tag);
-        undo    = () -> Database.getInstance().put(tag, value);
+        executer = () -> {
+            Object result = Database.getInstance().data.getJSONObject(tag);
+            Database.getInstance().data.remove(tag);
+            return result;
+        };
+        undoer   = () -> Database.getInstance().data.put(tag, value);
     }
 }

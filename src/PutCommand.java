@@ -5,22 +5,22 @@ import java.util.Map;
  */
 public class PutCommand extends Command {
     PutCommand(String tag, int value) {
-        execute = () -> Database.getInstance().put(tag, value);
-        undo = () -> Database.getInstance().retrieve(tag);
+        executer = () -> Database.getInstance().data.put(tag, value);
+        undoer   = () -> Database.getInstance().data.remove(tag);
     }
 
     PutCommand(String tag, String value) {
-        execute = () -> Database.getInstance().put(tag, value);
-        undo    = () -> Database.getInstance().retrieve(tag);
+        executer = () -> Database.getInstance().data.put(tag, value);
+        undoer   = () -> Database.getInstance().data.remove(tag);
     }
 
     PutCommand(String tag, Object[] value) {
-        execute = () -> Database.getInstance().put(tag, value);
-        undo    = () -> Database.getInstance().retrieve(tag);
+        executer = () -> Database.getInstance().data.put(tag, value);
+        undoer   = () -> Database.getInstance().data.remove(tag);
     }
 
     PutCommand(String tag, Map value) {
-        execute = () -> Database.getInstance().put(tag, value);
-        undo    = () -> Database.getInstance().retrieve(tag);
+        executer = () -> Database.getInstance().data.put(tag, value);
+        undoer   = () -> Database.getInstance().data.remove(tag);
     }
 }

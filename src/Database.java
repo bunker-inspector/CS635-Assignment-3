@@ -6,8 +6,9 @@ import java.util.Map;
  * Created by ted on 3/27/16.
  */
 public class Database {
-    private static Database ourInstance = new Database();
-    private JSONObject data = new JSONObject();
+    protected static Database ourInstance = new Database();
+    protected JSONObject data = new JSONObject();
+    protected Memento history = new Memento();
 
     public static Database getInstance() {
         return ourInstance;
@@ -27,16 +28,25 @@ public class Database {
     public void put(String tag, int value) {
         PutCommand p = new PutCommand(tag, value);
         p.execute();
+        history.store(p);
     }
 
     public void put(String tag, String value) {
+        PutCommand p = new PutCommand(tag, value);
+        p.execute();
+        history.store(p);
     }
 
     public void put(String tag, Object[] value) {
+        PutCommand p = new PutCommand(tag, value);
+        p.execute();
+        history.store(p);
     }
 
-    public boolean put(String tag, Map value) {
-        return true;
+    public void put(String tag, Map value) {
+        PutCommand p = new PutCommand(tag, value);
+        p.execute();
+        history.store(p);
     }
 
     public Object retrieve (String tag) {

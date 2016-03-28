@@ -4,10 +4,11 @@ import java.util.ArrayList;
  * Created by ted on 3/27/16.
  */
 public class Memento {
-    ArrayList<Command> states = new ArrayList<>();
+    private ArrayList<Command> states = new ArrayList<>();
 
-    void store(Command newState) {
+    int store(Command newState) {
         states.add(newState);
+        return states.size() - 1;
     }
 
     void rollBack (int stateIndex) {
@@ -15,5 +16,4 @@ public class Memento {
             states.get(i).undo();
         }
     }
-
 }
