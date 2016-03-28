@@ -62,4 +62,11 @@ public class Database {
         catch (FileNotFoundException e){}
         catch (IOException e) {}
     }
+
+    public static void main(String[] args) {
+        Database d = Database.getInstance();
+        Integer[] l = {1, 2, 3};
+        d.put("First", l);
+        System.out.println(d.data);
+    }
 }
