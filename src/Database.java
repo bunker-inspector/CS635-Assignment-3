@@ -6,23 +6,32 @@ import java.util.Map;
  * Created by ted on 3/27/16.
  */
 public class Database {
-    protected static Database ourInstance = new Database();
-    protected JSONObject data = new JSONObject();
+    protected static Database ourInstance;
+    protected static JSONObject data = new JSONObject();
     protected Memento history = new Memento();
 
     public static Database getInstance() {
+        if (ourInstance == null) {
+            ourInstance = new Database();
+            ourInstance.history.restore();
+        }
         return ourInstance;
     }
 
     private Database() {
         try {
             ObjectInputStream ois = new ObjectInputStream(new FileInputStream("dbfile"));
-            data = (JSONObject) ois.readObject();
+            history = (Memento) ois.readObject();
             ois.close();
         }
-        catch (FileNotFoundException e) {}
-        catch (ClassNotFoundException e) {}
-        catch (IOException e) {}
+        catch (FileNotFoundException e) {
+        }
+        catch (ClassNotFoundException e) {
+            e.printStackTrace();
+        }
+        catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     public void put(String tag, int value) {
@@ -56,7 +65,7 @@ public class Database {
     private void close() {
         try {
             ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream("dbfile"));
-            oos.writeObject(data);
+            oos.writeObject(history);
             oos.close();
         }
         catch (FileNotFoundException e){}
@@ -66,7 +75,8 @@ public class Database {
     public static void main(String[] args) {
         Database d = Database.getInstance();
         Integer[] l = {1, 2, 3};
-        d.put("First", l);
+        d.put("fourth", l);
         System.out.println(d.data);
+        d.close();
     }
 }
