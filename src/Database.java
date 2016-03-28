@@ -1,9 +1,12 @@
+import org.json.JSONArray;
 import org.json.JSONObject;
 import java.io.*;
 import java.util.Map;
 
 /**
  * Created by ted on 3/27/16.
+ *
+ * //TODO retrieve, transactions, cursor, unit tests....
  */
 public class Database {
     protected static Database ourInstance;
@@ -59,7 +62,23 @@ public class Database {
     }
 
     public Object retrieve (String tag) {
-        return null;
+        RetrieveCommand r = new RetrieveCommand(tag);
+        Object o = r.execute();
+
+        if(o instanceof Integer) {
+            System.out.println("INT");
+        }
+        else if (o instanceof  String) {
+            System.out.println("String");
+        }
+        else if (o instanceof Object[]) {
+            System.out.println("JArray");
+        }
+        else if (o instanceof Object) {
+            System.out.println("JObject");
+        }
+
+        return o;
     }
 
     private void close() {
@@ -74,8 +93,9 @@ public class Database {
 
     public static void main(String[] args) {
         Database d = Database.getInstance();
-        Integer[] l = {1, 2, 3};
-        d.put("fourth", l);
+        Object[] l = {1, "sda", 3};
+        d.put("first", l);
+        System.out.print((d.retrieve("first")).toString());
         System.out.println(d.data);
         d.close();
     }
