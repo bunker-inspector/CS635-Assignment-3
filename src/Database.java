@@ -14,7 +14,6 @@ public class Database implements Observer {
     protected static Database ourInstance;
     protected static JSONObject data = new JSONObject();
     protected Memento history = new Memento();
-    protected Transaction currentTransaction;
 
     class CommandExecutionFailedException extends Exception {
     }
@@ -34,19 +33,67 @@ public class Database implements Observer {
     }
 
     private class Transaction {
-        int startIndex;
-        Memento commands;
+        protected boolean isActive;
+        protected Memento commands;
 
         private Transaction() {
-            startIndex = history.size();
-            commands = history;
+            isActive = true;
+            commands = new Memento();
+        }
+
+        public void put(String tag, Object value) {
+            commands.store(new PutCommand(tag, value));
+        }
+
+        private Object get(String tag) {
+            GetCommand get = new GetCommand(tag);
+            commands.store(get);
+            return get.execute();
+        }
+
+        public Integer getInt(String tag) {
+            return (Integer)get(tag);
+        }
+
+        public Double getDouble(String tag) {
+            return (Double)get(tag);
+        }
+
+        public DatabaseArray getArray(String tag) {
+            return DatabaseArray.fromString((String)get(tag));
+        }
+
+        public DatabaseObject getObject(String tag) {
+            return DatabaseObject.fromString((String)get(tag));
+        }
+
+        public Object remove(String tag) {
+            return commands.store(new RemoveCommand(tag));
+        }
+
+        public boolean isActive() {
+            return isActive;
+        }
+
+        protected void abort() {
+            history.rollBack(0);
+        }
+
+        protected void reset() {
+            if(!isActive()) {
+                isActive = true;
+                commands = new Memento();
+            }
         }
 
         protected void commit() {
             try {
-                history.playBack(startIndex, history.size());
-            } catch (CommandExecutionFailedException e) {
-                history.rollBack(startIndex);
+                commands.playBack(0, commands.size());
+                history.states.addAll(commands.states);
+                isActive = false;
+            }
+            catch (CommandExecutionFailedException e) {
+                abort();
             }
         }
     }
@@ -75,7 +122,8 @@ public class Database implements Observer {
             history = (Memento) ois.readObject();
             ois.close();
         } catch (FileNotFoundException e) {
-            e.printStackTrace();
+            System.out.println("Database file not found: Creating new dbfile...");
+            history = new Memento();
         } catch (ClassNotFoundException e) {
             e.printStackTrace();
         } catch (IOException e) {
@@ -88,25 +136,14 @@ public class Database implements Observer {
         modify((String) arg, ((Cursor) o).watchValue);
     }
 
-    private boolean transactionPending() {
-        return (currentTransaction != null);
-    }
-
-    public void startTransaction() {
-        currentTransaction = new Transaction();
-    }
-
-    public void commmitTransaction() {
-        currentTransaction.commit();
-        currentTransaction = null;
+    public Transaction createTransaction() {
+        return new Transaction();
     }
 
     public void put(String tag, Object value) {
         PutCommand put = new PutCommand(tag, value);
         history.store(put);
-        if (!transactionPending()) {
-            put.execute();
-        }
+        put.execute();
     }
 
     public void put(String tag, DatabaseArray value) {
@@ -118,7 +155,9 @@ public class Database implements Observer {
     }
 
     public Object get(String tag) {
-        return (new GetCommand(tag)).execute();
+        GetCommand get = new GetCommand(tag);
+        history.store(get);
+        return (get).execute();
     }
 
     public Integer getInt(String tag) {
@@ -140,15 +179,7 @@ public class Database implements Observer {
     public Object remove(String tag) {
         RemoveCommand remove = new RemoveCommand(tag);
         history.store(remove);
-
-        Object result;
-        if (!transactionPending()) {
-            result = remove.execute();
-        } else {
-            result = data.get(tag);
-        }
-
-        return result;
+        return remove.execute();
     }
 
     public void modify(String tag, Object value) {
@@ -158,19 +189,23 @@ public class Database implements Observer {
         history.store(remove);
         history.store(put);
 
-        if (!transactionPending()) {
-            remove.execute();
-            put.execute();
-        }
+        remove.execute();
+        put.execute();
     }
 
-    private void close() {
+    public void rollBack(int version) {
+        history.rollBack(version);
+    }
+
+    public void close() {
         try {
             ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream("dbfile"));
             oos.writeObject(history);
             oos.close();
         } catch (FileNotFoundException e) {
+            e.printStackTrace();
         } catch (IOException e) {
+            e.printStackTrace();
         }
     }
 
@@ -277,7 +312,11 @@ public class Database implements Observer {
 
         DatabaseObject o = DatabaseObject.fromString("{'d' : [4, 5, 6]}");
 
+        System.out.println(o.data.toString());
+
         d.put("d", o);
+        System.out.println(d.data.toString());
+
         o = d.getObject("d");
 
         System.out.print(o.data.toString());

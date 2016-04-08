@@ -5,7 +5,7 @@ import java.util.ArrayList;
  * Created by ted on 3/27/16.
  */
 public class Memento implements Serializable{
-    private ArrayList<Command> states = new ArrayList<>();
+    ArrayList<Command> states = new ArrayList<>();
 
     int size() {
         return states.size();
