@@ -1,4 +1,5 @@
 import org.json.JSONArray;
+import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.*;
@@ -15,8 +16,14 @@ public class Database implements Observer {
     protected Memento history = new Memento();
     protected Transaction currentTransaction;
 
-    class CommandExecutionFailedException extends Exception {}
-    class ImproperTypeRequestException extends CommandExecutionFailedException {};
+    class CommandExecutionFailedException extends Exception {
+    }
+
+    class ImproperTypeRequestException extends CommandExecutionFailedException {
+    }
+
+    static class OhHellNoNotInMyDatabaseException extends Exception {
+    }
 
     public static Database getInstance() {
         if (ourInstance == null) {
@@ -38,14 +45,13 @@ public class Database implements Observer {
         protected void commit() {
             try {
                 history.playBack(startIndex, history.size());
-            }
-            catch (CommandExecutionFailedException e) {
+            } catch (CommandExecutionFailedException e) {
                 history.rollBack(startIndex);
             }
         }
     }
 
-    private static class Cursor extends Observable{
+    private static class Cursor extends Observable {
         protected Object watchValue;
         protected String tag;
 
@@ -68,20 +74,18 @@ public class Database implements Observer {
             ObjectInputStream ois = new ObjectInputStream(new FileInputStream("dbfile"));
             history = (Memento) ois.readObject();
             ois.close();
-        }
-        catch (FileNotFoundException e) {
-        }
-        catch (ClassNotFoundException e) {
+        } catch (FileNotFoundException e) {
             e.printStackTrace();
-        }
-        catch (IOException e) {
+        } catch (ClassNotFoundException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
     @Override
     public void update(Observable o, Object arg) {
-        modify((String)arg, ((Cursor)o).watchValue);
+        modify((String) arg, ((Cursor) o).watchValue);
     }
 
     private boolean transactionPending() {
@@ -100,24 +104,20 @@ public class Database implements Observer {
     public void put(String tag, Object value) {
         PutCommand put = new PutCommand(tag, value);
         history.store(put);
-        if(!transactionPending()) {
+        if (!transactionPending()) {
             put.execute();
         }
     }
 
-    static class DatabaseObject {
-        DatabaseObject(JSONObject j) {
-
-        }
+    public void put(String tag, DatabaseArray value) {
+        put(tag, value.data.toString());
     }
 
-    static class DatabaseArray {
-        DatabaseArray(JSONArray j) {
-
-        }
+    public void put(String tag, DatabaseObject value) {
+        put(tag, value.data.toString());
     }
 
-    private Object get(String tag) {
+    public Object get(String tag) {
         return (new GetCommand(tag)).execute();
     }
 
@@ -130,11 +130,11 @@ public class Database implements Observer {
     }
 
     public DatabaseObject getObject(String tag) {
-        return new DatabaseObject((JSONObject)get(tag));
+        return DatabaseObject.fromString((String)get(tag));
     }
 
     public DatabaseArray getArray(String tag) {
-        return new DatabaseArray((JSONArray)get(tag));
+        return DatabaseArray.fromString((String)get(tag));
     }
 
     public Object remove(String tag) {
@@ -142,10 +142,9 @@ public class Database implements Observer {
         history.store(remove);
 
         Object result;
-        if(!transactionPending()) {
+        if (!transactionPending()) {
             result = remove.execute();
-        }
-        else {
+        } else {
             result = data.get(tag);
         }
 
@@ -154,12 +153,12 @@ public class Database implements Observer {
 
     public void modify(String tag, Object value) {
         RemoveCommand remove = new RemoveCommand(tag);
-        PutCommand put           = new PutCommand(tag, value);
+        PutCommand put = new PutCommand(tag, value);
 
         history.store(remove);
         history.store(put);
 
-        if(!transactionPending()) {
+        if (!transactionPending()) {
             remove.execute();
             put.execute();
         }
@@ -170,23 +169,118 @@ public class Database implements Observer {
             ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream("dbfile"));
             oos.writeObject(history);
             oos.close();
+        } catch (FileNotFoundException e) {
+        } catch (IOException e) {
         }
-        catch (FileNotFoundException e){}
-        catch (IOException e) {}
+    }
+
+    static abstract class DatabaseType {
+        public int length() {
+            return data.length();
+        }
+
+        public String toString() {
+            return data.toString();
+        }
+    }
+
+    static class DatabaseObject {
+        JSONObject data;
+
+        DatabaseObject(JSONObject j) {
+            data = j;
+        }
+
+        public JSONObject put(String tag, Object o) throws OhHellNoNotInMyDatabaseException {
+            if (o == null) {
+                throw new OhHellNoNotInMyDatabaseException();
+            }
+            data.put(tag, o);
+            return data;
+        }
+
+        public Object get(String tag) {
+            return data.get(tag);
+        }
+
+        public int getInt(String tag) {
+            return data.getInt(tag);
+        }
+
+        public double getDouble(String tag) {
+            return data.getDouble(tag);
+        }
+
+        public DatabaseArray getArray(String tag) {
+            return new DatabaseArray(data.getJSONArray(tag));
+        }
+
+        public DatabaseObject getObject(String tag) {
+            return new DatabaseObject(data.getJSONObject(tag));
+        }
+
+        public static DatabaseObject fromString(String newData) {
+            return new DatabaseObject(new JSONObject(newData));
+        }
+    }
+
+    static class DatabaseArray {
+        protected JSONArray data;
+
+        DatabaseArray(JSONArray j) {
+            data = j;
+        }
+
+        public void put(Object o) throws OhHellNoNotInMyDatabaseException {
+            if (o == null) {
+                throw new OhHellNoNotInMyDatabaseException();
+            }
+            data.put(o);
+        }
+
+        public void remove(int index) {
+            data.remove(index);
+        }
+
+        public Object get(int index) {
+            try {
+                return data.get(index);
+            }
+            catch(JSONException j) {
+                throw new ArrayIndexOutOfBoundsException();
+            }
+        }
+
+        public int getInt(int index) {
+            return data.getInt(index);
+        }
+
+        public double getDouble(int index) {
+            return data.getDouble(index);
+        }
+
+        public DatabaseArray getArray(int index) {
+            return new DatabaseArray(data.getJSONArray(index));
+        }
+
+        public DatabaseObject getObject(int index) {
+            return new DatabaseObject(data.getJSONObject(index));
+        }
+
+        public static DatabaseArray fromString(String newData) {
+            return new DatabaseArray(new JSONArray(newData));
+        }
     }
 
     public static void main(String[] args) {
         Database d = Database.getInstance();
 
-        Object[] o = {"s", new Object(), 4, "string"};
+        DatabaseObject o = DatabaseObject.fromString("{'d' : [4, 5, 6]}");
 
-        d.modify("d", o);
-        System.out.print(data.toString());
+        d.put("d", o);
+        o = d.getObject("d");
 
-        Cursor c = new Cursor("d");
-        c.set(912);
-
-        System.out.print(data.toString());
+        System.out.print(o.data.toString());
         d.close();
     }
 }
