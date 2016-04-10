@@ -11,5 +11,6 @@ public class GetCommand extends Command implements Serializable {
             return result;
         };
         undoer   = (IUndo & Serializable)() -> null;
+        serializer = (ISerialize & Serializable)() -> null;
     }
 }

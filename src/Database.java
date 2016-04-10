@@ -1,11 +1,14 @@
+import com.sun.xml.internal.bind.v2.schemagen.xmlschema.Import;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import javax.sound.midi.SysexMessage;
 import java.io.*;
 import java.util.Map;
 import java.util.Observable;
 import java.util.Observer;
+import java.util.Scanner;
 
 /**
  * Created by ted on 3/27/16.
@@ -14,6 +17,12 @@ public class Database implements Observer {
     protected static Database ourInstance;
     protected static JSONObject data = new JSONObject();
     protected Memento history = new Memento();
+    protected static PrintWriter deltas;
+    public static final String  PUT_ID    = "PUT",
+                                REMOVE_ID = "REM";
+    public static final String  INTEGER = "class java.lang.Integer",
+                                DOUBLE  = "class java.lang.Double",
+                                STRING   = "class java.lang.String";
 
     class CommandExecutionFailedException extends Exception {
     }
@@ -24,7 +33,8 @@ public class Database implements Observer {
     static class OhHellNoNotInMyDatabaseException extends Exception {
     }
 
-    public static Database getInstance() {
+    public static Database getInstance() throws CommandExecutionFailedException,
+            Command.ImproperFormattingException {
         if (ourInstance == null) {
             ourInstance = new Database();
             ourInstance.history.restore();
@@ -102,7 +112,7 @@ public class Database implements Observer {
         protected Object watchValue;
         protected String tag;
 
-        Cursor(String t) {
+        Cursor(String t) throws CommandExecutionFailedException, Command.ImproperFormattingException {
             tag = t;
             watchValue = data.get(tag);
             addObserver(Database.getInstance());
@@ -116,14 +126,18 @@ public class Database implements Observer {
         }
     }
 
-    private Database() {
+    private Database() throws CommandExecutionFailedException, Command.ImproperFormattingException {
         try {
-            ObjectInputStream ois = new ObjectInputStream(new FileInputStream("dbfile"));
-            history = (Memento) ois.readObject();
-            ois.close();
+            recover();
         } catch (FileNotFoundException e) {
             System.out.println("Database file not found: Creating new dbfile...");
             history = new Memento();
+            try {
+                deltas = new PrintWriter(new File("commands.txt"));
+            }
+            catch (FileNotFoundException f) {
+                //this should never happen
+            }
         } catch (ClassNotFoundException e) {
             e.printStackTrace();
         } catch (IOException e) {
@@ -144,6 +158,7 @@ public class Database implements Observer {
         PutCommand put = new PutCommand(tag, value);
         history.store(put);
         put.execute();
+        deltas.println(put.serialize());
     }
 
     public void put(String tag, DatabaseArray value) {
@@ -156,7 +171,6 @@ public class Database implements Observer {
 
     public Object get(String tag) {
         GetCommand get = new GetCommand(tag);
-        history.store(get);
         return (get).execute();
     }
 
@@ -179,6 +193,7 @@ public class Database implements Observer {
     public Object remove(String tag) {
         RemoveCommand remove = new RemoveCommand(tag);
         history.store(remove);
+        deltas.println(remove.serialize());
         return remove.execute();
     }
 
@@ -198,15 +213,51 @@ public class Database implements Observer {
     }
 
     public void close() {
+        if(deltas != null) {
+            deltas.close();
+        }
+    }
+
+    public void snapshot() {
+        snapshot(new File("commands.txt"), new File("dbSnapshot.txt"));
+    }
+
+    public void snapshot(File commands, File snapshot) {
         try {
-            ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream("dbfile"));
+            ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(snapshot));
             oos.writeObject(history);
             oos.close();
+
+            deltas = new PrintWriter(commands);
         } catch (FileNotFoundException e) {
             e.printStackTrace();
         } catch (IOException e) {
             e.printStackTrace();
         }
+    }
+
+    public void recover() throws FileNotFoundException, IOException,
+            ClassNotFoundException, CommandExecutionFailedException,
+            Command.ImproperFormattingException{
+        recover(new File("commands.txt"), new File("dbSnapshot.txt"));
+    }
+
+    public void recover(File commands, File snapshot) throws FileNotFoundException, IOException,
+            ClassNotFoundException, CommandExecutionFailedException, Command.ImproperFormattingException {
+        ObjectInputStream ois = new ObjectInputStream(new FileInputStream(snapshot));
+        history = (Memento) ois.readObject();
+        history.playBack(0, history.size() - 1);
+
+        BufferedReader commandFileReader = new BufferedReader(new FileReader(commands));
+        String currentLine;
+
+        while((currentLine = commandFileReader.readLine() ) != null) {
+            Command currentCommand = Command.deserializeCommand(currentLine);
+            currentCommand.execute();
+            history.store(currentCommand);
+        }
+
+        deltas = new PrintWriter(new FileWriter(commands, true));
     }
 
     static abstract class DatabaseType {
@@ -257,6 +308,11 @@ public class Database implements Observer {
         public static DatabaseObject fromString(String newData) {
             return new DatabaseObject(new JSONObject(newData));
         }
+
+        @Override
+        public String toString() {
+            return data.toString();
+        }
     }
 
     static class DatabaseArray {
@@ -305,21 +361,28 @@ public class Database implements Observer {
         public static DatabaseArray fromString(String newData) {
             return new DatabaseArray(new JSONArray(newData));
         }
+
+        @Override
+        public String toString() {
+            return data.toString();
+        }
     }
 
-    public static void main(String[] args) {
+    @Override
+    public String toString() {
+        return data.toString();
+    }
+
+    public static void main(String[] args) throws CommandExecutionFailedException, Command.ImproperFormattingException {
         Database d = Database.getInstance();
 
-        DatabaseObject o = DatabaseObject.fromString("{'d' : [4, 5, 6]}");
+        d.put("v", 5);
+         DatabaseObject o = DatabaseObject.fromString("{'r': [1, 2 ,4]}");
+        d.put("u", o);
 
-        System.out.println(o.data.toString());
+        System.out.println(d.toString());
 
-        d.put("d", o);
-        System.out.println(d.data.toString());
-
-        o = d.getObject("d");
-
-        System.out.print(o.data.toString());
+        d.snapshot();
         d.close();
     }
 }
