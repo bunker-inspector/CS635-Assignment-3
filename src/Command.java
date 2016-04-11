@@ -23,7 +23,6 @@ public abstract class Command implements Serializable{
     }
 
     static Command deserializeCommand(String serializedCommand) throws ImproperFormattingException {
-        System.out.println(serializedCommand);
         String[] commandTokens = serializedCommand.split("\t");
         switch (commandTokens[0]) {
             case Database.PUT_ID:
@@ -33,10 +32,11 @@ public abstract class Command implements Serializable{
                     case Database.DOUBLE:
                         return new PutCommand(commandTokens[1], Double.parseDouble(commandTokens[3]));
                     case Database.STRING:
-                        if(commandTokens[2].charAt(0) == '[')
+                        return new PutCommand(commandTokens[1], commandTokens[3]);
+                    case Database.ARRAY:
                             return new PutCommand(commandTokens[1],
                                     Database.DatabaseArray.fromString(commandTokens[3]).toString());
-                        else
+                    case Database.OBJECT:
                             return new PutCommand(commandTokens[1],
                                     Database.DatabaseObject.fromString(commandTokens[3]).toString());
                 }

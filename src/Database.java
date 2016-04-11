@@ -1,4 +1,5 @@
 import com.sun.xml.internal.bind.v2.schemagen.xmlschema.Import;
+import com.sun.xml.internal.bind.v2.schemagen.xmlschema.Wildcard;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -13,7 +14,7 @@ import java.util.Scanner;
 /**
  * Created by ted on 3/27/16.
  */
-public class Database implements Observer {
+public class Database extends Observable {
     protected static Database ourInstance;
     protected static JSONObject data = new JSONObject();
     protected Memento history = new Memento();
@@ -22,7 +23,9 @@ public class Database implements Observer {
                                 REMOVE_ID = "REM";
     public static final String  INTEGER = "class java.lang.Integer",
                                 DOUBLE  = "class java.lang.Double",
-                                STRING   = "class java.lang.String";
+                                STRING  = "class java.lang.String",
+                                OBJECT  = "class org.json.JSONObject",
+                                ARRAY   = "class org.json.JSONArray";
 
     class CommandExecutionFailedException extends Exception {
     }
@@ -69,6 +72,8 @@ public class Database implements Observer {
             return (Double)get(tag);
         }
 
+        public String getString(String tag) { return (String)get(tag); }
+
         public DatabaseArray getArray(String tag) {
             return DatabaseArray.fromString((String)get(tag));
         }
@@ -108,21 +113,46 @@ public class Database implements Observer {
         }
     }
 
-    private static class Cursor extends Observable {
+    public Cursor getCursor(String tag) throws CommandExecutionFailedException, Command.ImproperFormattingException{
+        return new Cursor(tag);
+    }
+
+    private static class Cursor implements Observer {
         protected Object watchValue;
         protected String tag;
 
-        Cursor(String t) throws CommandExecutionFailedException, Command.ImproperFormattingException {
+        private Cursor(String t) throws CommandExecutionFailedException, Command.ImproperFormattingException {
             tag = t;
             watchValue = data.get(tag);
-            addObserver(Database.getInstance());
         }
 
-        void set(Object newValue) {
-            watchValue = newValue;
-            setChanged();
-            notifyObservers(tag);
-            clearChanged();
+        public Object get(){
+            return watchValue;
+        }
+
+        public Integer getInt() {
+            return (Integer)watchValue;
+        }
+
+        public Double getDouble() {
+            return (Double)watchValue;
+        }
+
+        public String getString() {
+            return (String)watchValue;
+        }
+
+        public DatabaseObject getObject(String tag) {
+            return (DatabaseObject)watchValue;
+        }
+
+        public DatabaseArray getArray(String tag) {
+            return (DatabaseArray)watchValue;
+        }
+
+        @Override
+        public void update(Observable o, Object arg) {
+                watchValue = data.get(tag);
         }
     }
 
@@ -146,9 +176,15 @@ public class Database implements Observer {
     }
 
     @Override
-    public void update(Observable o, Object arg) {
-        modify((String) arg, ((Cursor) o).watchValue);
+    public synchronized void addObserver(Observer o) {
+        super.addObserver(o);
     }
+
+    public synchronized void removeObserver(Observer o) {
+        super.deleteObserver(o);
+    }
+
+
 
     public Transaction createTransaction() {
         return new Transaction();
@@ -159,14 +195,17 @@ public class Database implements Observer {
         history.store(put);
         put.execute();
         deltas.println(put.serialize());
+        setChanged();
+        notifyObservers();
+        clearChanged();
     }
 
     public void put(String tag, DatabaseArray value) {
-        put(tag, value.data.toString());
+        put(tag, value.data);
     }
 
     public void put(String tag, DatabaseObject value) {
-        put(tag, value.data.toString());
+        put(tag, value.data);
     }
 
     public Object get(String tag) {
@@ -182,6 +221,8 @@ public class Database implements Observer {
         return (Double)get(tag);
     }
 
+    public String getString(String tag) { return (String)get(tag); }
+
     public DatabaseObject getObject(String tag) {
         return DatabaseObject.fromString((String)get(tag));
     }
@@ -193,19 +234,15 @@ public class Database implements Observer {
     public Object remove(String tag) {
         RemoveCommand remove = new RemoveCommand(tag);
         history.store(remove);
+
         deltas.println(remove.serialize());
-        return remove.execute();
-    }
+        Object result = remove.execute();
 
-    public void modify(String tag, Object value) {
-        RemoveCommand remove = new RemoveCommand(tag);
-        PutCommand put = new PutCommand(tag, value);
+        setChanged();
+        notifyObservers();
+        clearChanged();
 
-        history.store(remove);
-        history.store(put);
-
-        remove.execute();
-        put.execute();
+        return result;
     }
 
     public void rollBack(int version) {
@@ -213,9 +250,7 @@ public class Database implements Observer {
     }
 
     public void close() {
-        if(deltas != null) {
-            deltas.close();
-        }
+        deltas.close();
     }
 
     public void snapshot() {
@@ -224,9 +259,9 @@ public class Database implements Observer {
 
     public void snapshot(File commands, File snapshot) {
         try {
-            ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(snapshot));
-            oos.writeObject(history);
-            oos.close();
+            PrintWriter stateWriter = new PrintWriter(snapshot);
+            stateWriter.print(data.toString());
+            stateWriter.close();
 
             deltas = new PrintWriter(commands);
         } catch (FileNotFoundException e) {
@@ -244,14 +279,19 @@ public class Database implements Observer {
 
     public void recover(File commands, File snapshot) throws FileNotFoundException, IOException,
             ClassNotFoundException, CommandExecutionFailedException, Command.ImproperFormattingException {
-        ObjectInputStream ois = new ObjectInputStream(new FileInputStream(snapshot));
-        history = (Memento) ois.readObject();
-        history.playBack(0, history.size() - 1);
-
-        BufferedReader commandFileReader = new BufferedReader(new FileReader(commands));
+        BufferedReader fileReader = new BufferedReader(new FileReader(snapshot));
         String currentLine;
 
-        while((currentLine = commandFileReader.readLine() ) != null) {
+        String savedState = "";
+        while((currentLine = fileReader.readLine() ) != null) {
+            savedState += currentLine;
+        }
+
+        data = new JSONObject(savedState);
+
+        fileReader = new BufferedReader(new FileReader(commands));
+
+        while((currentLine = fileReader.readLine() ) != null) {
             Command currentCommand = Command.deserializeCommand(currentLine);
             currentCommand.execute();
             history.store(currentCommand);
@@ -376,13 +416,8 @@ public class Database implements Observer {
     public static void main(String[] args) throws CommandExecutionFailedException, Command.ImproperFormattingException {
         Database d = Database.getInstance();
 
-        d.put("v", 5);
-         DatabaseObject o = DatabaseObject.fromString("{'r': [1, 2 ,4]}");
-        d.put("u", o);
-
         System.out.println(d.toString());
 
-        d.snapshot();
         d.close();
     }
 }
