@@ -114,7 +114,9 @@ public class Database extends Observable {
     }
 
     public Cursor getCursor(String tag) throws CommandExecutionFailedException, Command.ImproperFormattingException{
-        return new Cursor(tag);
+        Cursor newCursor = new Cursor(tag);
+        addObserver(newCursor);
+        return newCursor;
     }
 
     private static class Cursor implements Observer {
@@ -415,6 +417,13 @@ public class Database extends Observable {
 
     public static void main(String[] args) throws CommandExecutionFailedException, Command.ImproperFormattingException {
         Database d = Database.getInstance();
+
+        Cursor c = d.getCursor("d");
+        Integer i = c.getInt();
+
+        d.put("d", 8);
+
+        System.out.println(c.getInt());
 
         System.out.println(d.toString());
 
